@@ -8,42 +8,29 @@
 //feel free to experiment with changing these
 var CEM_settings = {
 	polygon_sides: 6, //6 = hexagon, 4 = square, 3 = triangle
-	polygon_radius: 100,
-	image_path: "./assets/pic.jpg"
+	polygon_radius: 100, //size of the tile
+	image_path: "./assets/pic.jpg" //image url if this tarts with a ./ it will be relative to the current directory
 };
 
 //these aren't general settings intended for changing.
 var CEM_globals = {
-	step_num: 0,
-	theta: 6.2831/CEM_settings.polygon_sides,
+	theta: 6.2831/CEM_settings.polygon_sides, //The angle inside one triangular segment of the polygon
 	image: null
 };
 
-//steps is an array of functions, these functions will be called one at a time, in order, as the next button is pressed
-CEM_globals.steps = [
-	circle,
-	angles,
-	angles2,
-	draw_poly,
-	image_mask,
-	image_mask2,
-	image_flip,
-	image_rotate,
-	grid,
-	tile
-];
+
 
 //this function returns 3 points, side point1, side point2, and the mid-point of these
-function get_polygon_side_points(i){
+function get_half_segment_points(){
 
 	var theta = CEM_globals.theta;
 	var radius = CEM_settings.polygon_radius;
 
 	var pts = { 
-				x1: cos(theta*i-theta/2)*radius,
-				y1: sin(theta*i-theta/2)*radius,
-				x2: cos(theta*(i+1)-theta/2)*radius,
-				y2: sin(theta*(i+1)-theta/2)*radius,
+				x1: cos(-theta/2)*radius,
+				y1: sin(-theta/2)*radius,
+				x2: cos(theta-theta/2)*radius,
+				y2: sin(theta-theta/2)*radius
 			};
 
 	pts.xM = lerp(pts.x1, pts.x2, 0.5);
@@ -52,99 +39,61 @@ function get_polygon_side_points(i){
 	return pts
 }
 
-function circle(){
-	stroke(200);
-	noFill();
-	ellipse(0, 0, CEM_settings.polygon_radius*2, CEM_settings.polygon_radius*2);
+function masked_image(){
+	pts = get_half_segment_points();
+	triangle_mask = createGraphics(CEM_globals.image.width, CEM_globals.image.height);
+	triangle_mask.clear();
+	triangle_mask.fill(255);
+	triangle_mask.noStroke();
+	triangle_mask.triangle(0,0,pts.x1,pts.y1,pts.xM, pts.yM);
+
+	CEM_globals.image.mask(triangle_mask);
+	return CEM_globals.image;
 }
 
-function angles(){
-	pts = get_polygon_side_points(0);
-	line(0,0, pts.x1, pts.y1);
-	noFill();
-	line(0,0,pts.x2,pts.y2);
-	ellipse(pts.x2,pts.y2,5,5);
+function polygon_segment(){
+	img = masked_image();
 
+	polygon_segment = createGraphics(CEM_globals.polygon_radius*2, CEM_globals.polygon_radius*2);
+	polygon_segment.translate(polygon_segment.width/2, polygon_segment.height/2);
+	polygon_segment.image(image);
+	polygon_segment.scale(1,-1); //mirror the segment on the y axis
+	polygon_segment.image(image);
+}
+
+function draw_polygon(polygon_image, pt){
+	imageMode(CENTER);
+	
 	push();
-		stroke(255,0,0, 100);
-		arc(0,0,CEM_settings.polygon_radius/2, CEM_settings.polygon_radius/2, -CEM_globals.theta/2, CEM_globals.theta/2);
 		
-		fill(0);
-		noStroke();
-		text("θ = TWO_PI/polygon_sides\nx = cos(θ-θ/2)*radius\ny = sin(θ-θ/2)*radius",pts.x2+10,pts.y2+10);
-		textAlign(CENTER);
-		text("θ", CEM_settings.polygon_radius/3, 0);
-		textAlign(LEFT);
+		translate(pt.x,pt.y);
+		scale(pt.sx, pt.sy);
+
+		for(var i=0; i < CEM_settings.polygon_sides; ++i){
+			image(polygon_image,0,0);
+			rotate(CEM_globals.theta);
+		}
+
 	pop();
 }
 
-function angles2(){
+function draw_catsEye_grid(){
 
-	push();
-	pts = get_polygon_side_points(0);
+	var polygon_segment_image = polygon_segment();
+	var grid_function = get_grid_function();
 
-	stroke(100);
-	line(0,0,pts.x1, pts.y1);
-	line(0,0, pts.xM, pts.yM);
-	line(pts.x1,pts.y1,pts.x2,pts.y2);
+	if(grid_function != null){
 
-	fill(100);
-	ellipse(pts.xM, pts.yM,5,5);
-	stroke(255,0,0, 100);
-	noFill();
-	line(0,0,pts.x2,pts.y2);
-	pop();
+		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
+			for(var j = 0; j < height/CEM_settings.polygon_radius*1.5; ++j){
+				pt = grid_function(i, j);
+				draw_polygon(polygon_segment_image, pt);
+			}	
+		}
 
-}
-
-function image_mask(){
-	background(255);
-	image(CEM_globals.image,0,0);
-	fill(255,100);
-	noStroke();
-	rect(0,-CEM_globals.image.height+1, CEM_globals.image.width, CEM_globals.image.height);
-	circle();
-	angles();
-	angles2();
-	draw_poly();
-}
-
-function image_mask2(){
-	background(255);
-	circle();
-	draw_poly();
-	pts = get_polygon_side_points(0);
-
-	var mask = createGraphics(CEM_globals.image.width,CEM_globals.image.height);
-	mask.clear();
-	mask.fill(255);
-	mask.triangle(0,0,pts.xM,pts.yM,pts.x2,pts.y2);
-	var mask_img = mask.get();
-
-	CEM_globals.image.mask(mask_img);
-
-	image(CEM_globals.image,0,0);
-}
-
-function image_flip(){
-
-	image(CEM_globals.image,0,0);
-	var img_cp = CEM_globals.image.get();
-	scale(1,-1);
-	image(CEM_globals.image,0,0);
-
-}
-
-function image_rotate(){
-
-	for(var i = 0; i < CEM_settings.polygon_sides; ++i){
-		push();
-			image_flip();
-		pop();
-		rotate(CEM_globals.theta);
 	}
-
 }
+
 
 function get_grid_function(){
 	var grid_function = null;
@@ -154,65 +103,10 @@ function get_grid_function(){
 	return grid_function;
 }
 
-function grid(){
-	
-	background(255);
-
-	var grid_function = get_grid_function();
-
-	if(grid_function != null){
-		translate(-width/2, -height/2);
-
-		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
-			for(var j = 0; j < height/CEM_settings.polygon_radius*1.5; ++j){
-				pt = grid_function(i,j);
-				push();
-					translate(pt.x, pt.y);
-					scale(pt.sx, pt.sy);
-					draw_poly();
-					if(i == 2 && j == 2){
-						image_rotate();
-					}
-				pop();
-			}	
-		}
-
-	}
-
-}
-
-function tile(){
-	
-	var grid_function = get_grid_function()
-
-	if(grid_function != null){
-		translate(-width/2, -height/2);
-
-		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
-			for(var j = 0; j < height/CEM_settings.polygon_radius*1.5; ++j){
-				pt = grid_function(i,j);
-				push();
-					translate(pt.x, pt.y);
-					scale(pt.sx, pt.sy);
-					image_rotate();
-				pop();
-			}	
-		}
-
-	}
-
-}
-
-function draw_poly(){
-	for(var i = 0; i < CEM_settings.polygon_sides; ++i){
-		pts = get_polygon_side_points(i);
-		line(pts.x1, pts.y1, pts.x2, pts.y2);
-	}
-}
-
-function hex_grid(i,j){
+//the following three functions describe how to layout the grid of shapes. 
+//they return a position and a scale (scale is used to mirror objects)
+function hexagon_grid_point(i,j){
 	var pts = get_polygon_side_points(0);
-
 	var w = 2 * dist(0,0,pts.xM,pts.yM);
 	var h = CEM_settings.polygon_radius*2;
 	var y_offset = dist(pts.xM,pts.yM,pts.x2,pts.y2);
@@ -220,14 +114,13 @@ function hex_grid(i,j){
 	return {x:(w*i)-x_offset, y:(h*j)-(j*y_offset),sx:1, sy:1};
 }
 
-function square_grid(i,j){
+function square_grid_point(i,j){
 	var w = 2 * dist(0,0,pts.xM,pts.yM);
 	var h = w;
-
 	return {x:w*i, y:h*j, sx:1, sy:1};
 }
 
-function tri_grid(i, j){
+function triangle_grid_point(i, j){
 	var wt = dist(0,0,pts.xM,pts.yM);
 	var w = wt + CEM_settings.polygon_radius;
 	var w_offset = i % 2 == 0 ? 0 : wt;
@@ -238,28 +131,12 @@ function tri_grid(i, j){
 }
 
 
-function next_step(){
-	if(CEM_globals.step_num < CEM_globals.steps.length){
-		current_step = CEM_globals.steps[CEM_globals.step_num]
-		
-		push();
-		translate(width/2, height/2);
-			current_step();
-		pop();
-
-		CEM_globals.step_num++;
-	}
-}
-
 
 function setup() {
 	createCanvas(500,500);
-	stroke(200);
-	button = createButton('next step');
-	button.mousePressed(next_step);
-	CEM_globals.image = loadImage(CEM_settings.image_path, function(){CEM_globals.image.resize(CEM_settings.polygon_radius,0);});
 }
 
 function draw() {
-  
+
+	noLoop();
 }
