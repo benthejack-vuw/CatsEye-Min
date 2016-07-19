@@ -1,22 +1,25 @@
+//is not particularly clean code, this file is meant for process demonstration purposes only. 
+//please see master branch for cleaner implementation.
+
 //CEM is short for catsEyeMin
 //The settings and globals objects are intended to keep any catseye variables sandboxed away from the global javascript context
 
 
 //feel free to experiment with changing these
 var CEM_settings = {
-	polygon_sides: 3, //6 = hexagon, 4 = square, 3 = triangle
+	polygon_sides: 6, //6 = hexagon, 4 = square, 3 = triangle
 	polygon_radius: 100,
 	image_path: "./assets/pic.jpg"
 };
 
-//although you should feel free to play with these, they aren't general settings intended for changing.
+//these aren't general settings intended for changing.
 var CEM_globals = {
 	step_num: 0,
 	theta: 6.2831/CEM_settings.polygon_sides,
 	image: null
 };
 
-//steps is an array of functions, these functions will be called one at a time as the next button is pressed
+//steps is an array of functions, these functions will be called one at a time, in order, as the next button is pressed
 CEM_globals.steps = [
 	circle,
 	angles,
@@ -30,7 +33,7 @@ CEM_globals.steps = [
 	tile
 ];
 
-
+//this function returns 3 points, side point1, side point2, and the mid-point of these
 function get_polygon_side_points(i){
 
 	var theta = CEM_globals.theta;
@@ -143,16 +146,21 @@ function image_rotate(){
 
 }
 
-function grid(){
-	
-	background(255);
-
+function get_grid_function(){
 	var grid_function = null;
 	grid_function = CEM_settings.polygon_sides == 3 ? tri_grid : grid_function;
 	grid_function = CEM_settings.polygon_sides == 4 ? square_grid : grid_function;
 	grid_function = CEM_settings.polygon_sides == 6 ? hex_grid : grid_function;
+	return grid_function;
+}
 
-	if(grid_function){
+function grid(){
+	
+	background(255);
+
+	var grid_function = get_grid_function();
+
+	if(grid_function != null){
 		translate(-width/2, -height/2);
 
 		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
@@ -175,10 +183,7 @@ function grid(){
 
 function tile(){
 	
-	var grid_function = null;
-	grid_function = CEM_settings.polygon_sides == 3 ? tri_grid : grid_function;
-	grid_function = CEM_settings.polygon_sides == 4 ? square_grid : grid_function;
-	grid_function = CEM_settings.polygon_sides == 6 ? hex_grid : grid_function;
+	var grid_function = get_grid_function()
 
 	if(grid_function != null){
 		translate(-width/2, -height/2);
@@ -223,7 +228,6 @@ function square_grid(i,j){
 }
 
 function tri_grid(i, j){
-
 	var wt = dist(0,0,pts.xM,pts.yM);
 	var w = wt + CEM_settings.polygon_radius;
 	var w_offset = i % 2 == 0 ? 0 : wt;
@@ -258,8 +262,4 @@ function setup() {
 
 function draw() {
   
-}
-
-function mousePressed(){
-	
 }
