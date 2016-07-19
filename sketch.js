@@ -4,7 +4,7 @@
 
 //feel free to experiment with changing these
 var CEM_settings = {
-	polygon_sides: 4, //hexagon - change this to 4 to see the process for a square, or 3 to see the process for a triangle
+	polygon_sides: 3, //6 = hexagon, 4 = square, 3 = triangle
 	polygon_radius: 100,
 	image_path: "./assets/pic.jpg"
 };
@@ -21,12 +21,33 @@ CEM_globals.steps = [
 	circle,
 	angles,
 	angles2,
+	draw_poly,
 	image_mask,
 	image_mask2,
 	image_flip,
 	image_rotate,
+	grid,
 	tile
 ];
+
+
+function get_polygon_side_points(i){
+
+	var theta = CEM_globals.theta;
+	var radius = CEM_settings.polygon_radius;
+
+	var pts = { 
+				x1: cos(theta*i-theta/2)*radius,
+				y1: sin(theta*i-theta/2)*radius,
+				x2: cos(theta*(i+1)-theta/2)*radius,
+				y2: sin(theta*(i+1)-theta/2)*radius,
+			};
+
+	pts.xM = lerp(pts.x1, pts.x2, 0.5);
+	pts.yM = lerp(pts.y1, pts.y2, 0.5);
+
+	return pts
+}
 
 function circle(){
 	stroke(200);
@@ -35,51 +56,41 @@ function circle(){
 }
 
 function angles(){
-	var theta = CEM_globals.theta;
-	var radius = CEM_settings.polygon_radius;
-
-	var x1 = cos(theta*0-theta/2)*radius
-	var y1 = sin(theta*0-theta/2)*radius
-	var x2 = cos(theta*1-theta/2)*radius
-	var y2 = sin(theta*1-theta/2)*radius
-
-	line(0,0,x1, y1);
-	stroke(255,0,0, 100);
+	pts = get_polygon_side_points(0);
+	line(0,0, pts.x1, pts.y1);
 	noFill();
-	line(0,0,x2,y2);
-	ellipse(x2,y2,5,5);
-	arc(0,0,radius/2, radius/2, -theta/2, theta/2);
-	fill(0);
-	noStroke();
+	line(0,0,pts.x2,pts.y2);
+	ellipse(pts.x2,pts.y2,5,5);
 
-
-	text("θ = TWO_PI/polygon_sides\nx = cos(θ-θ/2)*radius\ny = sin(θ-θ/2)*radius",x2+10,y2+10);
-	textAlign(CENTER);
-	text("θ", radius/3, 0);
-	textAlign(LEFT);
-
-	return {x1: x1, y1: y1, x2: x2, y2: y2};
+	push();
+		stroke(255,0,0, 100);
+		arc(0,0,CEM_settings.polygon_radius/2, CEM_settings.polygon_radius/2, -CEM_globals.theta/2, CEM_globals.theta/2);
+		
+		fill(0);
+		noStroke();
+		text("θ = TWO_PI/polygon_sides\nx = cos(θ-θ/2)*radius\ny = sin(θ-θ/2)*radius",pts.x2+10,pts.y2+10);
+		textAlign(CENTER);
+		text("θ", CEM_settings.polygon_radius/3, 0);
+		textAlign(LEFT);
+	pop();
 }
 
 function angles2(){
 
-	var pts = angles();	
-
-	var xm = lerp(pts.x1,pts.x2,0.5);
-	var ym = lerp(pts.y1,pts.y2,0.5);
+	push();
+	pts = get_polygon_side_points(0);
 
 	stroke(100);
 	line(0,0,pts.x1, pts.y1);
-	line(0,0, xm, ym);
+	line(0,0, pts.xM, pts.yM);
 	line(pts.x1,pts.y1,pts.x2,pts.y2);
 
 	fill(100);
-	ellipse(xm,ym,5,5);
+	ellipse(pts.xM, pts.yM,5,5);
 	stroke(255,0,0, 100);
 	noFill();
 	line(0,0,pts.x2,pts.y2);
-
-	return {x1: pts.x1, y1: pts.y1, x2: pts.x2, y2: pts.y2, xm: xm, ym: ym};
+	pop();
 
 }
 
@@ -92,18 +103,19 @@ function image_mask(){
 	circle();
 	angles();
 	angles2();
-
+	draw_poly();
 }
 
 function image_mask2(){
 	background(255);
 	circle();
-	pts = angles2();
+	draw_poly();
+	pts = get_polygon_side_points(0);
 
 	var mask = createGraphics(CEM_globals.image.width,CEM_globals.image.height);
 	mask.clear();
 	mask.fill(255);
-	mask.triangle(0,0,pts.xm,pts.ym,pts.x2,pts.y2);
+	mask.triangle(0,0,pts.xM,pts.yM,pts.x2,pts.y2);
 	var mask_img = mask.get();
 
 	CEM_globals.image.mask(mask_img);
@@ -112,22 +124,121 @@ function image_mask2(){
 }
 
 function image_flip(){
+
+	image(CEM_globals.image,0,0);
+	var img_cp = CEM_globals.image.get();
+	scale(1,-1);
+	image(CEM_globals.image,0,0);
+
 }
 
 function image_rotate(){
-	console.log("image_rotate");
+
+	for(var i = 0; i < CEM_settings.polygon_sides; ++i){
+		push();
+			image_flip();
+		pop();
+		rotate(CEM_globals.theta);
+	}
+
+}
+
+function grid(){
+	
+	background(255);
+
+	var grid_function = null;
+	grid_function = CEM_settings.polygon_sides == 3 ? tri_grid : grid_function;
+	grid_function = CEM_settings.polygon_sides == 4 ? square_grid : grid_function;
+	grid_function = CEM_settings.polygon_sides == 6 ? hex_grid : grid_function;
+
+	if(grid_function){
+		translate(-width/2, -height/2);
+
+		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
+			for(var j = 0; j < height/CEM_settings.polygon_radius*1.5; ++j){
+				pt = grid_function(i,j);
+				push();
+					translate(pt.x, pt.y);
+					scale(pt.sx, pt.sy);
+					draw_poly();
+					if(i == 2 && j == 2){
+						image_rotate();
+					}
+				pop();
+			}	
+		}
+
+	}
+
 }
 
 function tile(){
-	console.log("tile");
+	
+	var grid_function = null;
+	grid_function = CEM_settings.polygon_sides == 3 ? tri_grid : grid_function;
+	grid_function = CEM_settings.polygon_sides == 4 ? square_grid : grid_function;
+	grid_function = CEM_settings.polygon_sides == 6 ? hex_grid : grid_function;
+
+	if(grid_function != null){
+		translate(-width/2, -height/2);
+
+		for(var i = 0; i < width/CEM_settings.polygon_radius*1.5; ++i){
+			for(var j = 0; j < height/CEM_settings.polygon_radius*1.5; ++j){
+				pt = grid_function(i,j);
+				push();
+					translate(pt.x, pt.y);
+					scale(pt.sx, pt.sy);
+					image_rotate();
+				pop();
+			}	
+		}
+
+	}
+
 }
+
+function draw_poly(){
+	for(var i = 0; i < CEM_settings.polygon_sides; ++i){
+		pts = get_polygon_side_points(i);
+		line(pts.x1, pts.y1, pts.x2, pts.y2);
+	}
+}
+
+function hex_grid(i,j){
+	var pts = get_polygon_side_points(0);
+
+	var w = 2 * dist(0,0,pts.xM,pts.yM);
+	var h = CEM_settings.polygon_radius*2;
+	var y_offset = dist(pts.xM,pts.yM,pts.x2,pts.y2);
+	var x_offset = j % 2 == 0 ? 0 : w/2;
+	return {x:(w*i)-x_offset, y:(h*j)-(j*y_offset),sx:1, sy:1};
+}
+
+function square_grid(i,j){
+	var w = 2 * dist(0,0,pts.xM,pts.yM);
+	var h = w;
+
+	return {x:w*i, y:h*j, sx:1, sy:1};
+}
+
+function tri_grid(i, j){
+
+	var wt = dist(0,0,pts.xM,pts.yM);
+	var w = wt + CEM_settings.polygon_radius;
+	var w_offset = i % 2 == 0 ? 0 : wt;
+	w_offset = j%2 == 0 ? w_offset : -w_offset + CEM_settings.polygon_radius/2;
+	var h_div2 = dist(pts.x1,pts.y1,pts.xM,pts.yM);
+	var sx = (i%2 == 0 && j%2 == 0) || (i%2 == 1 && j%2 == 1) ? 1 : -1;
+	return {x:i*w-w_offset, y:j*h_div2, sx:sx, sy:1};
+}
+
 
 function next_step(){
 	if(CEM_globals.step_num < CEM_globals.steps.length){
 		current_step = CEM_globals.steps[CEM_globals.step_num]
 		
 		push();
-		
 		translate(width/2, height/2);
 			current_step();
 		pop();
