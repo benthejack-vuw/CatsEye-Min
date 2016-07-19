@@ -8,7 +8,7 @@
 //feel free to experiment with changing these
 var CEM_settings = {
 	polygon_sides: 6, //6 = hexagon, 4 = square, 3 = triangle
-	polygon_radius: 100,
+	polygon_radius: 200,
 	image_path: "./assets/pic.jpg"
 };
 
@@ -253,8 +253,9 @@ function next_step(){
 
 
 function setup() {
-	createCanvas(500,500);
+	createCanvas(window.innerWidth,window.innerHeight-50);
 	stroke(200);
+
 	button = createButton('next step');
 	button.mousePressed(next_step);
 	CEM_globals.image = loadImage(CEM_settings.image_path, function(){CEM_globals.image.resize(CEM_settings.polygon_radius,0);});
